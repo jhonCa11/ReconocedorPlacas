@@ -67,5 +67,5 @@ class PlateOCR:
         plate, probs = self.ocr_model.run(cropped_plate, return_confidence=True)
         #print("Texto de la placa:", plate)
         #print("Probabilidades:", probs)
-        return plate, probs
+        return plate, probs 
 
