@@ -9,37 +9,35 @@ import tensorflow as tf
 physical_devices = tf.config.experimental.list_physical_devices("GPU")
 if len(physical_devices) > 0:
     tf.config.experimental.set_memory_growth(physical_devices[0], True)
-# import os
-# os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 
 
 class PlateDetector:
     """
-    Modulo encargado del detector de patentes
+    Módulo encargado del detector de patentes
     """
 
     def __init__(
         self, weights_path: str, input_size: int = 608, iou: float = 0.45, score: float = 0.25
     ):
+        # Inicialización de los parámetros del detector de placas
         self.input_size = input_size
         self.iou = iou
         self.score = score
+        # Cargar el modelo YOLO
         self.saved_model_loaded = tf.saved_model.load(weights_path)
         self.yolo_infer = self.saved_model_loaded.signatures["serving_default"]
 
     def procesar_salida_yolo(self, output):
         """
-        Modificado de https://github.com/hunglc007/tensorflow-yolov4-tflite -
-                      /blob/9f16748aa3f45ff240608da4bd9b1216a29127f5/detectvideo.py#L91
-        Aplica a la salida de yolo Non Max Suppression (NMS) eliminando detecciones
-        duplicadas del mismo objeto
+        Aplica Non Max Suppression (NMS) a la salida de YOLO
+        para eliminar detecciones duplicadas.
 
-        Parametros:
-            output: tensor con la salida de yolo
-        Returns:
-            Lista con losd Bounding Boxes de todas
-            las patentes detectadas despues de NMS
+        Parámetros:
+            output: tensor con la salida de YOLO
+        Devuelve:
+            Lista con los bounding boxes de las patentes detectadas después de NMS
         """
+        # Aplicar NMS a la salida de YOLO
         for value in output.values():
             boxes = value[:, :, 0:4]
             pred_conf = value[:, :, 4:]
@@ -56,45 +54,41 @@ class PlateDetector:
 
     def preprocess(self, frame):
         """
-        Normalizar pixeles entre [0; 1], agregar
-        batch dimension y resizear la imagen para el
-        el modelo correspondiente de yolo
-        ej de las dimensiones : (1920,1080,3) -> (1,608,608,3)
-        Parametros
-            frame: numpy array
-        Returns: tf Tensor preprocesado
+        Preprocesa la imagen para la entrada al modelo YOLO.
+
+        Parámetros:
+            frame: numpy array conteniendo la imagen original
+        Devuelve:
+            Tensor preprocesado
         """
+        # Normalizar pixeles y ajustar dimensiones para YOLO
         image_data = cv2.resize(frame, (self.input_size, self.input_size))
         image_data = image_data / 255.0
         image_data = image_data[np.newaxis, ...].astype(np.float32)
-        # image_data = np.expand_dims(image_data, axis=0).astype(np.float32)
         return tf.constant(image_data)
 
     def predict(self, input_img: tf.Tensor):
         """
-        Hace la inferencia a partir del tensor
-        que contiene la img de entrada
+        Realiza la inferencia con el modelo YOLO.
 
-        Parametros:
-            input_img: tf Tensor con dimensiones
-            (1, self.input_size, self.input_size, 3)
-        Returns:
-            Output de la salida de YOLO
+        Parámetros:
+            input_img: tensor con dimensiones (1, self.input_size, self.input_size, 3)
+        Devuelve:
+            Salida de YOLO
         """
         return self.yolo_infer(input_img)
 
     def draw_bboxes(self, frame: np.ndarray, bboxes: list):
         """
-        Para visualizar la salida del detector, se dibujan
-        todos los rectangulos correspondiente a las patentes
-        en el frame de entrada
+        Dibuja los bounding boxes de las patentes en el frame.
 
-        Parametros:
+        Parámetros:
             frame: numpy array conteniendo el frame original
-            bboxes: predicciones/output de despues del NMS
-        Returns:
-            Numpy array conteniendo los rectangulos dibujados
+            bboxes: predicciones/output de después del NMS
+        Devuelve:
+            Frame con los bounding boxes dibujados
         """
+        # Dibujar los bounding boxes en el frame
         for x1, y1, x2, y2, score in self.yield_coords(frame, bboxes):
             font_scale = 2
             cv2.rectangle(frame, (x1, y1), (x2, y2), (36, 255, 12), 2)
@@ -111,19 +105,15 @@ class PlateDetector:
 
     def yield_coords(self, frame: np.ndarray, bboxes: list):
         """
-        Devuelve cada coordenada de los
-        rectangulo localizadas
+        Genera las coordenadas de los bounding boxes.
 
-        Parametros:
+        Parámetros:
             frame: numpy array conteniendo el frame original
-            bboxes: predicciones/output de despues del NMS
-
-        Returns:
-            (x1, y1, x2, y2):   Coordenas relativas al frame de la determinada
-                                patente
-            score:  Probabilidad de objectness de yolo
-                    (que tan seguro piensa que es una patente)
+            bboxes: predicciones/output de después del NMS
+        Devuelve:
+            Coordenadas de los bounding boxes y la probabilidad de objectness
         """
+        # Obtener las coordenadas de los bounding boxes
         out_boxes, out_scores, _, num_boxes = bboxes
         image_h, image_w, _ = frame.shape
         for i in range(num_boxes[0]):

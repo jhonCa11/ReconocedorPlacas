@@ -4,15 +4,18 @@ from alpr.detector import PlateDetector
 import cv2
 from timeit import default_timer as timer
 from argparse import ArgumentParser
+#Codigo para ejecutar: python detector_demo.py --fuente-video ./assets/test_patente2.mp4 --mostrar-resultados --input-size 608
 
 
 def main_demo(args):
+    # Configuración de los parámetros
     input_size = args.input_size
     video_path = args.video_source
     weights_path = f'./alpr/models/detection/tf-yolo_tiny_v4-{input_size}x{input_size}-custom-anchors/'
     iou = 0.45
     score = 0.25
-    # Detector
+    
+    # Inicialización del detector de placas
     detector_patente = PlateDetector(
         weights_path, input_size=input_size, iou=iou, score=score)
     print("Video from: ", video_path)
@@ -25,30 +28,34 @@ def main_demo(args):
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         else:
             break
-        # Preprocess frame
+        
+        # Preprocesamiento del frame
         input_img = detector_patente.preprocess(frame)
-        # Inference
+        
+        # Inferencia
         yolo_out = detector_patente.predict(input_img)
-        # Bounding Boxes despues de NMS
+        
+        # Obtención de los bounding boxes después de NMS
         bboxes = detector_patente.procesar_salida_yolo(yolo_out)
+        
         # Mostrar predicciones
         start = timer()
         frame_w_preds = detector_patente.draw_bboxes(frame, bboxes)
         end = timer()
+        
         # Tiempo de inferencia
         exec_time = end - start
         fps = 1. / exec_time
-        if args.mostrar_benchmark and args.mostrar_resultados:
-            display_bench = f'ms: {exec_time:.4f} FPS: {fps:.0f}'
-            fontScale = 1.5
-            cv2.putText(frame_w_preds, display_bench, (5, 45), cv2.FONT_HERSHEY_SIMPLEX,
-                        fontScale, (10, 140, 10), 4)
-        elif args.mostrar_benchmark:
+        
+        # Mostrar benchmark si está habilitado
+        if args.mostrar_benchmark:
             print(f'Inferencia\tms: {exec_time:.5f}\t', end='')
             print(f'FPS: {fps:.0f}')
+        
+        # Mostrar resultados si está habilitado
         if args.mostrar_resultados:
             result = cv2.cvtColor(frame_w_preds, cv2.COLOR_RGB2BGR)
-            # Show results
+            # Mostrar resultados
             cv2.namedWindow("result", cv2.WINDOW_AUTOSIZE)
             cv2.imshow("result", result)
             if cv2.waitKey(1) & 0xFF == ord('q'):
